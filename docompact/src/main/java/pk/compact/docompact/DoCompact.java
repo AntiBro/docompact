@@ -38,18 +38,22 @@ import org.codehaus.plexus.util.StringUtils;
  */
 @Mojo(name = "compact", defaultPhase = LifecyclePhase.PACKAGE)
 public class DoCompact extends AbstractMojo {
-	/**
-	 * Location of the file.
-	 */
+
 	@Parameter(defaultValue = "${project.build.directory}", property = "outputDir", required = true)
 	private File outputDirectory;
 
 	@Parameter(defaultValue = "${project.build.finalName}")
 	private String finalName;
 
+	/**
+	 * 默认需要打包的文件类型
+	 */
 	@Parameter(defaultValue = "class,xml,properties,jsp,html,txt,png,jpg,gif,css")
 	private String[] includesFileTypes;
 
+	/**
+	 * cache文件名
+	 */
 	@Parameter(defaultValue = "compactCache")
 	private String CacheFileName;
 
@@ -72,6 +76,9 @@ public class DoCompact extends AbstractMojo {
 	@Parameter(defaultValue = "0")
 	private Integer compactJarType;
 
+	/**
+	 * 是否开启源代码的增量打包
+	 */
 	@Parameter(defaultValue = "0")
 	private Integer useCached;
 
