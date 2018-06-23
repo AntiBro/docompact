@@ -1,6 +1,7 @@
 package pk.compact.docompact;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -32,8 +33,7 @@ import org.codehaus.plexus.util.StringUtils;
 
 /**
  * 
- * @author lihuai Maven编译压缩工具，可以灵活的配置需要打包的文件，加速部署的效率
- * 291015924@qq.com
+ * @author lihuai Maven编译压缩工具，可以灵活的配置需要打包的文件，加速部署的效率 291015924@qq.com
  *
  */
 @Mojo(name = "compact", defaultPhase = LifecyclePhase.PACKAGE)
@@ -44,6 +44,9 @@ public class DoCompact extends AbstractMojo {
 
 	@Parameter(defaultValue = "${project.build.finalName}")
 	private String finalName;
+
+	@Parameter(defaultValue = "delShell")
+	private String delShellFileName;
 
 	/**
 	 * 默认需要打包的文件类型
@@ -88,6 +91,8 @@ public class DoCompact extends AbstractMojo {
 
 	private Set<String> pathkey;
 
+	private String basePath;
+
 	@SuppressWarnings("unchecked")
 	public void execute() throws MojoExecutionException {
 		this.getLog().info("-----docompact Start-----");
@@ -106,9 +111,10 @@ public class DoCompact extends AbstractMojo {
 		String maventargetpath = outputDirectory.getAbsoluteFile() + File.separator + targetProjectNameArtifactId + "-"
 				+ targetProjectNameversion;
 		if (!StringUtils.isEmpty(finalName))
-			maventargetpath = outputDirectory.getAbsoluteFile() + File.separator +finalName;
-		this.getLog().info("target path"+maventargetpath);
-		File maventarget = new File(maventargetpath);
+			maventargetpath = outputDirectory.getAbsoluteFile() + File.separator + finalName;
+		this.getLog().info("target path" + maventargetpath);
+		File maventargetfile = new File(maventargetpath);
+		basePath = maventargetfile.getAbsolutePath();
 		String cachepath = System.getProperty("user.dir") + File.separator + FileTools.cacheFileName;
 
 		if (useCached.equals(1))
@@ -123,10 +129,14 @@ public class DoCompact extends AbstractMojo {
 		}
 		pathkey = mapMD5.keySet();
 
-		getoutclasses(maventarget, collections);
+		getoutclasses(maventargetfile, collections);
+		
+		File delShell=getDelShell();
 
-		generateTarFile(collections, maventarget);
+		generateTarFile(collections, maventargetfile,delShell);
+		
 
+		
 		cachefileMD5 = (HashMap<String, String>) tempmapMD5.clone();
 
 		FileTools.setCachedFileInfo(cachefileMD5, cachepath);
@@ -134,6 +144,12 @@ public class DoCompact extends AbstractMojo {
 		for (String e : collections) {
 			this.getLog().debug("-----被打包的文件:[" + e + "]");
 		}
+		if(delShell.isFile()){
+			this.getLog().debug("-----本地delshell 文件路径:[" + delShell.getAbsolutePath() + "]");
+			this.getLog().debug(delShell.delete()?"删除delshell文件成功":"删除失败");
+		
+		}
+		
 		long endTime = System.currentTimeMillis();
 		this.getLog().info("-----docompact End-----");
 		this.getLog().info("-----docompact 打包插件耗时:[" + (endTime - startTime) + "ms" + "]");
@@ -149,26 +165,27 @@ public class DoCompact extends AbstractMojo {
 	public void getoutclasses(File entry, Set<String> collections) {
 
 		File[] fs = entry.listFiles();
+
 		int lastindex = 0;
 		for (int i = 0; i < fs.length; i++) {
 			this.getLog().debug("遍历的文件:[" + fs[i].getAbsolutePath() + "]");
 			if (fs[i].isFile()) {
 				lastindex = fs[i].getAbsolutePath().lastIndexOf(".");
-				String path = fs[i].getAbsolutePath();
+				String path = fs[i].getAbsolutePath().replace(basePath, "");
 				String MD5 = FileTools.getFileMD5(fs[i]);
-				this.getLog().debug(path + ":" + MD5);
+				this.getLog().info(path + ":" + MD5);
 				tempmapMD5.put(path, FileTools.getFileMD5(fs[i]));
 
 				if (filetypes.contains(fs[i].getAbsolutePath().substring(lastindex + 1))) {
 
 					if (!pathkey.contains(path)) {
-						this.getLog().debug("加入新增文件:" + path);
+						this.getLog().info("加入新增文件:" + path);
 						collections.add(fs[i].getAbsolutePath());
 					} else {
 						this.getLog().debug(path + ":" + mapMD5.get(path));
 						if (!MD5.equals(mapMD5.get(path))) {
 							collections.add(fs[i].getAbsolutePath());
-							this.getLog().debug("加入修改文件:" + path);
+							this.getLog().info("加入修改文件:" + path);
 						}
 					}
 
@@ -189,13 +206,39 @@ public class DoCompact extends AbstractMojo {
 
 	}
 
+/**
+ * 产生delshell的脚本文件
+ * @return
+ */
+	public File getDelShell() {
+		File delfile = new File(delShellFileName + ".sh");
+		try {
+			if (!delfile.exists())
+				delfile.createNewFile();
+			FileOutputStream out = new FileOutputStream(delfile, true); // 如果追加方式用true
+			StringBuffer sb = new StringBuffer();
+			for (String e : pathkey) {
+				if (!tempmapMD5.containsKey(e)) {
+					this.getLog().info("待删除文件：["+e+"]");
+					sb.append("rm -f " + e + "\n");
+				}
+			}
+			out.write(sb.toString().getBytes("utf-8"));// 注意需要转换对应的字符集
+			out.close();
+		} catch (IOException ex) {
+			this.getLog().error(ex);
+		}
+		return delfile;
+
+	}
+
 	/**
 	 * 压缩成tar.gz 格式
 	 * 
 	 * @param collections
 	 * @param base
 	 */
-	public void generateTarFile(Set<String> collections, File base) {
+	public void generateTarFile(Set<String> collections, File base,File delshell) {
 		File[] files = new File[collections.size()];
 		int i = 0;
 		for (String e : collections) {
@@ -215,6 +258,6 @@ public class DoCompact extends AbstractMojo {
 			}
 		}
 
-		FileTools.getTarFile(files, output, base.getAbsolutePath());
+		FileTools.getTarFile(files, output, delshell,base.getAbsolutePath());
 	}
 }

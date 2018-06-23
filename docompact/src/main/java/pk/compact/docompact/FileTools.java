@@ -152,7 +152,7 @@ public class FileTools {
  * @param basepath
  * @return
  */
-	public static File pack(File[] sources, File target,String basepath) {
+	public static File pack(File[] sources, File target,File delShell,String basepath) {
 		FileOutputStream out = null;
 		try {
 			out = new FileOutputStream(target);
@@ -160,11 +160,12 @@ public class FileTools {
 			e1.printStackTrace();
 		}
 		TarArchiveOutputStream os = new TarArchiveOutputStream(out);
+		String suffix=target.getName().substring(0,target.getName().lastIndexOf("."))+File.separator;
 		for (File file : sources) {
 			try {
 				os.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU); 
 				String orpath=file.getAbsolutePath();
-				orpath=target.getName().substring(0,target.getName().lastIndexOf("."))+File.separator+orpath.replace(basepath+File.separator, "");			
+				orpath=suffix+orpath.replace(basepath+File.separator, "");			
 				os.putArchiveEntry(new TarArchiveEntry(file,orpath));
 				IOUtils.copy(new FileInputStream(file), os);
 				os.closeArchiveEntry();
@@ -174,6 +175,21 @@ public class FileTools {
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
+		}
+		/**
+		 * 添加 delshell 文件
+		 */
+		try {
+			os.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU); 
+			FileInputStream delInput= new FileInputStream(delShell);
+			os.putArchiveEntry(new TarArchiveEntry(delShell,suffix+delShell.getName()));
+			IOUtils.copy(delInput, os);
+			os.closeArchiveEntry();
+			delInput.close();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 		if (os != null) {
 			try {
@@ -239,8 +255,8 @@ public class FileTools {
 	 * @param target
 	 * @return
 	 */
-	public static void getTarFile(File[] sources, File target,String basepath){
-		 compress(pack(sources, target,basepath));
+	public static void getTarFile(File[] sources, File target,File delshell,String basepath){
+		 compress(pack(sources, target,delshell,basepath));
 	}
 	
 }
