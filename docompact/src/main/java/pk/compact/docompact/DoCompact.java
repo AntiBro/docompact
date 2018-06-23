@@ -138,7 +138,7 @@ public class DoCompact extends AbstractMojo {
 
 		generateTarFile(collections, maventargetfile, delShell);
 
-		cachefileMD5 = (HashMap<String, String>) tempmapMD5.clone();
+		cachefileMD5 =  tempmapMD5;
 
 		FileTools.setCachedFileInfo(cachefileMD5, cachepath);
 
