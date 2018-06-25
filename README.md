@@ -42,7 +42,14 @@ docompact
 </plugin>
 ```
 
-
+与jenkins结合使用:
+```
+cd /opt/tomcat/webapps
+tar zxvf docompact.tar.gz
+chmod 777 docompact/delShell.sh
+cd docompact
+./delShell.sh
+```
 
 
 
